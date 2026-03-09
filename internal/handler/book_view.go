@@ -1,60 +1,57 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
+	"github.com/example/learn-go-gin/internal/model"
+	"github.com/example/learn-go-gin/internal/repository"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
-// Book 代表書籍資料結構（目前使用假資料，後續 U06 會改為從 DB 取得）
-type Book struct {
-	ID        int64
-	Title     string
-	Author    string
-	ISBN      string
-	Stock     int
-	CreatedAt string
-	UpdatedAt string
+// BookViewHandler 書籍 MVC Handler（頁面渲染）
+type BookViewHandler struct {
+	repo repository.BookRepository
 }
 
-// fakeBooks 是假資料，用於 U02 教學示範
-// 後續 U06 會改為從資料庫取得
-var fakeBooks = []Book{
-	{ID: 1, Title: "Clean Code", Author: "Robert C. Martin", ISBN: "978-0132350884", Stock: 5, CreatedAt: "2024-01-01 10:00", UpdatedAt: "2024-01-01 10:00"},
-	{ID: 2, Title: "The Pragmatic Programmer", Author: "Andy Hunt", ISBN: "978-0135957059", Stock: 0, CreatedAt: "2024-01-02 11:00", UpdatedAt: "2024-01-02 11:00"},
-	{ID: 3, Title: "Refactoring", Author: "Martin Fowler", ISBN: "978-0134757599", Stock: 3, CreatedAt: "2024-01-03 12:00", UpdatedAt: "2024-01-03 12:00"},
+// NewBookViewHandler 建立 BookViewHandler 實例
+func NewBookViewHandler(repo repository.BookRepository) *BookViewHandler {
+	return &BookViewHandler{repo: repo}
 }
 
 // ListBooks 書籍清單頁
-// c.HTML() 三個參數：HTTP 狀態碼、模板名稱、傳入模板的資料
-func ListBooks(c *gin.Context) {
+// 從 Repository 取得真實 DB 資料
+func (h *BookViewHandler) ListBooks(c *gin.Context) {
+	books, err := h.repo.FindAll()
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Error fetching books")
+		return
+	}
+
 	c.HTML(http.StatusOK, "book/list.html", gin.H{
 		"title": "書籍清單",
-		"books": fakeBooks,
+		"books": books,
 	})
 }
 
 // ShowBook 書籍詳情頁
-func ShowBook(c *gin.Context) {
+func (h *BookViewHandler) ShowBook(c *gin.Context) {
 	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
 		c.String(http.StatusBadRequest, "無效的 ID")
 		return
 	}
 
-	// 從假資料中找書（後續 U06 改為查 DB）
-	var book *Book
-	for _, b := range fakeBooks {
-		if b.ID == id {
-			book = &b
-			break
+	book, err := h.repo.FindByID(uint(id))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.String(http.StatusNotFound, "找不到書籍")
+			return
 		}
-	}
-
-	if book == nil {
-		c.String(http.StatusNotFound, "找不到書籍")
+		c.String(http.StatusInternalServerError, "Error fetching book")
 		return
 	}
 
@@ -65,7 +62,7 @@ func ShowBook(c *gin.Context) {
 }
 
 // NewBookForm 顯示新增書籍表單
-func NewBookForm(c *gin.Context) {
+func (h *BookViewHandler) NewBookForm(c *gin.Context) {
 	c.HTML(http.StatusOK, "book/form.html", gin.H{
 		"title":  "新增書籍",
 		"isEdit": false,
@@ -74,31 +71,51 @@ func NewBookForm(c *gin.Context) {
 	})
 }
 
-// CreateBook 接收新增書籍表單（目前只是假實作，後續 U06 會存入 DB）
-func CreateBook(c *gin.Context) {
-	// 目前只是重導回清單頁，後續 U06 會實作真正的新增邏輯
+// CreateBook 接收新增書籍表單
+func (h *BookViewHandler) CreateBook(c *gin.Context) {
+	title := c.PostForm("title")
+	author := c.PostForm("author")
+	isbn := c.PostForm("isbn")
+	stockStr := c.PostForm("stock")
+
+	stock, _ := strconv.Atoi(stockStr)
+
+	book := &model.Book{
+		Title:  title,
+		Author: author,
+		ISBN:   isbn,
+		Stock:  stock,
+	}
+
+	if err := h.repo.Create(book); err != nil {
+		c.HTML(http.StatusBadRequest, "book/form.html", gin.H{
+			"title":  "新增書籍",
+			"isEdit": false,
+			"book":   book,
+			"errors": map[string]string{"general": err.Error()},
+		})
+		return
+	}
+
 	c.Redirect(http.StatusFound, "/books")
 }
 
 // EditBookForm 顯示編輯書籍表單
-func EditBookForm(c *gin.Context) {
+func (h *BookViewHandler) EditBookForm(c *gin.Context) {
 	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
 		c.String(http.StatusBadRequest, "無效的 ID")
 		return
 	}
 
-	var book *Book
-	for _, b := range fakeBooks {
-		if b.ID == id {
-			book = &b
-			break
+	book, err := h.repo.FindByID(uint(id))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.String(http.StatusNotFound, "找不到書籍")
+			return
 		}
-	}
-
-	if book == nil {
-		c.String(http.StatusNotFound, "找不到書籍")
+		c.String(http.StatusInternalServerError, "Error fetching book")
 		return
 	}
 
@@ -110,13 +127,58 @@ func EditBookForm(c *gin.Context) {
 	})
 }
 
-// UpdateBook 接收編輯書籍表單（目前只是假實作，後續 U06 會更新 DB）
-func UpdateBook(c *gin.Context) {
-	id := c.Param("id")
-	c.Redirect(http.StatusFound, "/books/"+id)
+// UpdateBook 接收編輯書籍表單
+func (h *BookViewHandler) UpdateBook(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		c.String(http.StatusBadRequest, "無效的 ID")
+		return
+	}
+
+	book, err := h.repo.FindByID(uint(id))
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.String(http.StatusNotFound, "找不到書籍")
+			return
+		}
+		c.String(http.StatusInternalServerError, "Error fetching book")
+		return
+	}
+
+	// 更新欄位
+	book.Title = c.PostForm("title")
+	book.Author = c.PostForm("author")
+	book.ISBN = c.PostForm("isbn")
+	stock, _ := strconv.Atoi(c.PostForm("stock"))
+	book.Stock = stock
+
+	if err := h.repo.Update(book); err != nil {
+		c.HTML(http.StatusBadRequest, "book/form.html", gin.H{
+			"title":  "編輯書籍",
+			"isEdit": true,
+			"book":   book,
+			"errors": map[string]string{"general": err.Error()},
+		})
+		return
+	}
+
+	c.Redirect(http.StatusFound, "/books/"+idStr)
 }
 
-// DeleteBook 刪除書籍（目前只是假實作，後續 U06 會從 DB 刪除）
-func DeleteBook(c *gin.Context) {
+// DeleteBook 刪除書籍
+func (h *BookViewHandler) DeleteBook(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		c.String(http.StatusBadRequest, "無效的 ID")
+		return
+	}
+
+	if err := h.repo.Delete(uint(id)); err != nil {
+		c.String(http.StatusInternalServerError, "Error deleting book")
+		return
+	}
+
 	c.Redirect(http.StatusFound, "/books")
 }

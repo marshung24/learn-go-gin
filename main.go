@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/example/learn-go-gin/internal/config"
 	"github.com/example/learn-go-gin/internal/handler"
+	"github.com/example/learn-go-gin/internal/repository"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,6 +16,16 @@ func main() {
 	// 載入設定檔
 	// Viper 會讀取 .env 檔案和環境變數，環境變數優先於檔案
 	config.LoadConfig()
+
+	// 初始化資料庫連線
+	config.InitDB()
+
+	// 初始化 Repository
+	bookRepo := repository.NewBookRepository(config.DB)
+
+	// 初始化 Handler
+	bookViewHandler := handler.NewBookViewHandler(bookRepo)
+	bookAPIHandler := handler.NewBookAPIHandler(bookRepo)
 
 	// 建立 Gin 引擎，包含預設的 Logger 和 Recovery middleware
 	r := gin.Default()
@@ -29,23 +40,23 @@ func main() {
 	r.GET("/whoami", handler.Whoami)
 
 	// 書籍 MVC 路由（頁面渲染）
-	r.GET("/books", handler.ListBooks)
-	r.GET("/books/new", handler.NewBookForm)
-	r.GET("/books/:id", handler.ShowBook)
-	r.GET("/books/:id/edit", handler.EditBookForm)
-	r.POST("/books", handler.CreateBook)
-	r.POST("/books/:id/edit", handler.UpdateBook)
-	r.POST("/books/:id/delete", handler.DeleteBook)
+	r.GET("/books", bookViewHandler.ListBooks)
+	r.GET("/books/new", bookViewHandler.NewBookForm)
+	r.GET("/books/:id", bookViewHandler.ShowBook)
+	r.GET("/books/:id/edit", bookViewHandler.EditBookForm)
+	r.POST("/books", bookViewHandler.CreateBook)
+	r.POST("/books/:id/edit", bookViewHandler.UpdateBook)
+	r.POST("/books/:id/delete", bookViewHandler.DeleteBook)
 
 	// 書籍 REST API 路由（回傳 JSON）
 	// r.Group() 建立路由群組，統一路徑前綴
 	api := r.Group("/api")
 	{
-		api.GET("/books", handler.GetBooks)
-		api.GET("/books/:id", handler.GetBookByID)
-		api.POST("/books", handler.CreateBookAPI)
-		api.PUT("/books/:id", handler.UpdateBookAPI)
-		api.DELETE("/books/:id", handler.DeleteBookAPI)
+		api.GET("/books", bookAPIHandler.GetBooks)
+		api.GET("/books/:id", bookAPIHandler.GetBookByID)
+		api.POST("/books", bookAPIHandler.CreateBook)
+		api.PUT("/books/:id", bookAPIHandler.UpdateBook)
+		api.DELETE("/books/:id", bookAPIHandler.DeleteBook)
 	}
 
 	// 啟動 HTTP 伺服器
