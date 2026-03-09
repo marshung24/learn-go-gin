@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/example/learn-go-gin/internal/config"
 	"github.com/example/learn-go-gin/internal/handler"
+	"github.com/example/learn-go-gin/internal/middleware"
 	"github.com/example/learn-go-gin/internal/repository"
 	"github.com/example/learn-go-gin/internal/service"
 	"github.com/gin-gonic/gin"
@@ -25,8 +26,17 @@ func main() {
 	bookViewHandler := handler.NewBookViewHandler(bookService)
 	bookAPIHandler := handler.NewBookAPIHandler(bookService)
 
-	// 建立 Gin 引擎，包含預設的 Logger 和 Recovery middleware
-	r := gin.Default()
+	// 建立 Gin 引擎
+	// 使用 gin.New() 搭配自訂 middleware，而非 gin.Default()
+	r := gin.New()
+
+	// 註冊 middleware
+	// - Recovery: 攔截 panic，避免 server 崩潰
+	// - Logger: 記錄請求日誌
+	// - ErrorHandler: 統一錯誤回應格式
+	r.Use(middleware.Recovery())
+	r.Use(middleware.Logger())
+	r.Use(middleware.ErrorHandler())
 
 	// 載入 HTML 模板
 	r.LoadHTMLGlob("templates/**/*")
