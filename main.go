@@ -32,6 +32,17 @@ func main() {
 	r.POST("/books/:id/edit", handler.UpdateBook)
 	r.POST("/books/:id/delete", handler.DeleteBook)
 
+	// 書籍 REST API 路由（回傳 JSON）
+	// r.Group() 建立路由群組，統一路徑前綴
+	api := r.Group("/api")
+	{
+		api.GET("/books", handler.GetBooks)
+		api.GET("/books/:id", handler.GetBookByID)
+		api.POST("/books", handler.CreateBookAPI)
+		api.PUT("/books/:id", handler.UpdateBookAPI)
+		api.DELETE("/books/:id", handler.DeleteBookAPI)
+	}
+
 	// 啟動 HTTP 伺服器，監聽 8080 port
 	// 這是內嵌的 HTTP Server，不需要額外安裝 Web Server
 	r.Run(":8080")
