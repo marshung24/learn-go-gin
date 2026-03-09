@@ -1,0 +1,56 @@
+// VS Code「Reopen in Container」或 GitHub Codespaces 開啟專案時，會讀取這個檔案來建立開發環境
+{
+  "name": "gin-app-dev",
+
+  // 透過 docker-compose.yml 啟動所有服務（app、MySQL、Redis）
+  "dockerComposeFile": "../docker-compose.yml",
+
+  // 開發者操作的主要容器（對應 docker-compose.yml 裡的 app 服務）
+  "service": "app",
+
+  // 容器啟動後，VS Code 會開啟這個資料夾作為工作目錄
+  // 這個路徑要和 docker-compose.yml 裡 app 的 bind mount 目標路徑一致
+  "workspaceFolder": "/workspaces/go-gin-sample",
+
+  "remoteUser": "root",
+
+  // 關閉 VS Code 視窗時，一併停止所有 docker-compose 服務
+  "shutdownAction": "stopCompose",
+
+  // VS Code 在容器內自動安裝的擴充套件與設定
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",                    // Go 官方擴充（語法、除錯、測試、gopls 整合）
+        "redhat.vscode-yaml",           // YAML 語法提示（config.yaml 等）
+        "ms-azuretools.vscode-docker"   // Docker 支援
+      ],
+      "settings": {
+        "go.useLanguageServer": true,
+        "go.lintTool": "golangci-lint",
+        "go.lintFlags": ["--fast"],
+        "go.formatTool": "goimports",
+        "editor.formatOnSave": true,
+        "[go]": {
+          "editor.defaultFormatter": "golang.go",
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+          }
+        },
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+
+  // 讓本機可以直接用 localhost 連到容器內的這些 port
+  "forwardPorts": [8080, 3306, 6379],
+
+  "postCreateCommand": "echo 'Dev container ready.'",
+
+  "mounts": [
+    // 把 Go 模組快取存到獨立的 Docker volume
+    // 這樣重建容器時不用重新下載所有依賴，節省時間
+    "source=go_mod_cache,target=/go/pkg/mod,type=volume",
+    "source=go_build_cache,target=/root/.cache/go-build,type=volume"
+  ]
+}

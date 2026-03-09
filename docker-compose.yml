@@ -1,0 +1,99 @@
+# 本專案的容器化開發環境，包含三個服務：
+#   app   — Go 開發容器（編譯 & 執行 Gin 應用）
+#   db    — MySQL 8（資料庫）
+#   redis — Redis 7（快取）
+#
+# 如需調整 port 或專案名稱，複製 .env.example 為 .env 後修改即可
+
+services:
+
+  # ---- Go 開發容器 ----
+  # 這個容器是開發者的主要工作環境，VS Code 會連進這裡
+  app:
+    build:
+      context: .
+      dockerfile: docker/go/Dockerfile
+    container_name: ${PROJECT_NAME:-gin-app}-app
+    # 等 MySQL 和 Redis 都啟動完成（healthcheck 通過）後，才啟動 app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Taipei
+      # Go 模組快取目錄
+      GOMODCACHE: /go/pkg/mod
+      # 應用程式環境變數（可在程式中讀取）
+      APP_ENV: docker
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: app
+      DB_PASSWORD: app
+      DB_NAME: app
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    volumes:
+      # 把本機專案目錄掛載到容器內，改了程式碼會即時同步
+      # :cached 可以提升 macOS 上的檔案讀取效能（Linux 無影響）
+      - .:/workspaces/go-gin-sample:cached
+      # Go 模組快取存到獨立的 Docker volume，重建容器時不用重新下載依賴
+      - go_mod_cache:/go/pkg/mod
+      # Go build 快取
+      - go_build_cache:/root/.cache/go-build
+    # 容器啟動後不會自動跑應用，而是保持待命，等開發者手動執行 go run 或 air
+    command: ["sleep", "infinity"]
+
+  # ---- MySQL 8 ----
+  db:
+    image: mysql:8.0
+    container_name: ${PROJECT_NAME:-gin-app}-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: app          # 自動建立名為 app 的資料庫
+      MYSQL_USER: app              # 自動建立 app 使用者
+      MYSQL_PASSWORD: app          # app 使用者的密碼
+      TZ: Asia/Taipei
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      # 資料庫檔案存到 Docker volume，重建容器時資料不會消失
+      - mysql_data:/var/lib/mysql
+    command: ["--default-authentication-plugin=mysql_native_password"]
+    # 每 5 秒檢查一次 MySQL 是否就緒，最多重試 30 次
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # ---- Redis 7 ----
+  redis:
+    image: redis:7-alpine
+    container_name: ${PROJECT_NAME:-gin-app}-redis
+    environment:
+      TZ: Asia/Taipei
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    # 開啟 AOF 持久化
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+# Docker volume 定義 — 資料存在 Docker 管理的磁碟區，不會因為刪除容器而遺失
+volumes:
+  mysql_data:
+    name: ${PROJECT_NAME:-gin-app}_mysql_data
+  redis_data:
+    name: ${PROJECT_NAME:-gin-app}_redis_data
+  go_mod_cache:
+    name: ${PROJECT_NAME:-gin-app}_go_mod_cache
+  go_build_cache:
+    name: ${PROJECT_NAME:-gin-app}_go_build_cache
