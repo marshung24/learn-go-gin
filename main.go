@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/example/learn-go-gin/internal/config"
 	"github.com/example/learn-go-gin/internal/handler"
 	"github.com/gin-gonic/gin"
 )
@@ -11,6 +12,10 @@ import (
 // - Logger：記錄每個請求的方法、路徑、狀態碼、處理時間
 // - Recovery：捕獲 panic 並回傳 500 錯誤，避免程式崩潰
 func main() {
+	// 載入設定檔
+	// Viper 會讀取 .env 檔案和環境變數，環境變數優先於檔案
+	config.LoadConfig()
+
 	// 建立 Gin 引擎，包含預設的 Logger 和 Recovery middleware
 	r := gin.Default()
 
@@ -43,7 +48,8 @@ func main() {
 		api.DELETE("/books/:id", handler.DeleteBookAPI)
 	}
 
-	// 啟動 HTTP 伺服器，監聽 8080 port
+	// 啟動 HTTP 伺服器
 	// 這是內嵌的 HTTP Server，不需要額外安裝 Web Server
-	r.Run(":8080")
+	// 從設定檔讀取 port，預設 8080
+	r.Run(":" + config.AppCfg.App.Port)
 }
