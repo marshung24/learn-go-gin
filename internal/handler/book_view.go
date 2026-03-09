@@ -5,26 +5,25 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/example/learn-go-gin/internal/model"
-	"github.com/example/learn-go-gin/internal/repository"
+	"github.com/example/learn-go-gin/internal/model/dto"
+	"github.com/example/learn-go-gin/internal/service"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 // BookViewHandler 書籍 MVC Handler（頁面渲染）
 type BookViewHandler struct {
-	repo repository.BookRepository
+	service service.BookService
 }
 
 // NewBookViewHandler 建立 BookViewHandler 實例
-func NewBookViewHandler(repo repository.BookRepository) *BookViewHandler {
-	return &BookViewHandler{repo: repo}
+func NewBookViewHandler(svc service.BookService) *BookViewHandler {
+	return &BookViewHandler{service: svc}
 }
 
 // ListBooks 書籍清單頁
-// 從 Repository 取得真實 DB 資料
 func (h *BookViewHandler) ListBooks(c *gin.Context) {
-	books, err := h.repo.FindAll()
+	books, err := h.service.FindAll()
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Error fetching books")
 		return
@@ -45,7 +44,7 @@ func (h *BookViewHandler) ShowBook(c *gin.Context) {
 		return
 	}
 
-	book, err := h.repo.FindByID(uint(id))
+	book, err := h.service.FindByID(uint(id))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.String(http.StatusNotFound, "找不到書籍")
@@ -73,25 +72,20 @@ func (h *BookViewHandler) NewBookForm(c *gin.Context) {
 
 // CreateBook 接收新增書籍表單
 func (h *BookViewHandler) CreateBook(c *gin.Context) {
-	title := c.PostForm("title")
-	author := c.PostForm("author")
-	isbn := c.PostForm("isbn")
-	stockStr := c.PostForm("stock")
+	stock, _ := strconv.Atoi(c.PostForm("stock"))
 
-	stock, _ := strconv.Atoi(stockStr)
-
-	book := &model.Book{
-		Title:  title,
-		Author: author,
-		ISBN:   isbn,
+	input := &dto.BookCreateDTO{
+		Title:  c.PostForm("title"),
+		Author: c.PostForm("author"),
+		ISBN:   c.PostForm("isbn"),
 		Stock:  stock,
 	}
 
-	if err := h.repo.Create(book); err != nil {
+	if _, err := h.service.Create(input); err != nil {
 		c.HTML(http.StatusBadRequest, "book/form.html", gin.H{
 			"title":  "新增書籍",
 			"isEdit": false,
-			"book":   book,
+			"book":   input,
 			"errors": map[string]string{"general": err.Error()},
 		})
 		return
@@ -109,7 +103,7 @@ func (h *BookViewHandler) EditBookForm(c *gin.Context) {
 		return
 	}
 
-	book, err := h.repo.FindByID(uint(id))
+	book, err := h.service.FindByID(uint(id))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.String(http.StatusNotFound, "找不到書籍")
@@ -136,28 +130,24 @@ func (h *BookViewHandler) UpdateBook(c *gin.Context) {
 		return
 	}
 
-	book, err := h.repo.FindByID(uint(id))
-	if err != nil {
+	stock, _ := strconv.Atoi(c.PostForm("stock"))
+
+	input := &dto.BookCreateDTO{
+		Title:  c.PostForm("title"),
+		Author: c.PostForm("author"),
+		ISBN:   c.PostForm("isbn"),
+		Stock:  stock,
+	}
+
+	if _, err := h.service.Update(uint(id), input); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.String(http.StatusNotFound, "找不到書籍")
 			return
 		}
-		c.String(http.StatusInternalServerError, "Error fetching book")
-		return
-	}
-
-	// 更新欄位
-	book.Title = c.PostForm("title")
-	book.Author = c.PostForm("author")
-	book.ISBN = c.PostForm("isbn")
-	stock, _ := strconv.Atoi(c.PostForm("stock"))
-	book.Stock = stock
-
-	if err := h.repo.Update(book); err != nil {
 		c.HTML(http.StatusBadRequest, "book/form.html", gin.H{
 			"title":  "編輯書籍",
 			"isEdit": true,
-			"book":   book,
+			"book":   input,
 			"errors": map[string]string{"general": err.Error()},
 		})
 		return
@@ -175,7 +165,7 @@ func (h *BookViewHandler) DeleteBook(c *gin.Context) {
 		return
 	}
 
-	if err := h.repo.Delete(uint(id)); err != nil {
+	if err := h.service.Delete(uint(id)); err != nil {
 		c.String(http.StatusInternalServerError, "Error deleting book")
 		return
 	}

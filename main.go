@@ -4,34 +4,31 @@ import (
 	"github.com/example/learn-go-gin/internal/config"
 	"github.com/example/learn-go-gin/internal/handler"
 	"github.com/example/learn-go-gin/internal/repository"
+	"github.com/example/learn-go-gin/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
 // main 是 Go 應用程式的進入點。
 // 使用 Gin 框架建立 HTTP 伺服器，並註冊路由。
-// gin.Default() 會自動包含 Logger 和 Recovery middleware：
-// - Logger：記錄每個請求的方法、路徑、狀態碼、處理時間
-// - Recovery：捕獲 panic 並回傳 500 錯誤，避免程式崩潰
+// 分層架構：Handler → Service → Repository → DB
 func main() {
 	// 載入設定檔
-	// Viper 會讀取 .env 檔案和環境變數，環境變數優先於檔案
 	config.LoadConfig()
 
 	// 初始化資料庫連線
 	config.InitDB()
 
-	// 初始化 Repository
+	// 初始化各層
+	// Repository → Service → Handler
 	bookRepo := repository.NewBookRepository(config.DB)
-
-	// 初始化 Handler
-	bookViewHandler := handler.NewBookViewHandler(bookRepo)
-	bookAPIHandler := handler.NewBookAPIHandler(bookRepo)
+	bookService := service.NewBookService(bookRepo)
+	bookViewHandler := handler.NewBookViewHandler(bookService)
+	bookAPIHandler := handler.NewBookAPIHandler(bookService)
 
 	// 建立 Gin 引擎，包含預設的 Logger 和 Recovery middleware
 	r := gin.Default()
 
 	// 載入 HTML 模板
-	// LoadHTMLGlob 會載入指定 pattern 的所有模板檔案
 	r.LoadHTMLGlob("templates/**/*")
 
 	// 基本路由
@@ -49,7 +46,6 @@ func main() {
 	r.POST("/books/:id/delete", bookViewHandler.DeleteBook)
 
 	// 書籍 REST API 路由（回傳 JSON）
-	// r.Group() 建立路由群組，統一路徑前綴
 	api := r.Group("/api")
 	{
 		api.GET("/books", bookAPIHandler.GetBooks)
@@ -60,7 +56,5 @@ func main() {
 	}
 
 	// 啟動 HTTP 伺服器
-	// 這是內嵌的 HTTP Server，不需要額外安裝 Web Server
-	// 從設定檔讀取 port，預設 8080
 	r.Run(":" + config.AppCfg.App.Port)
 }
