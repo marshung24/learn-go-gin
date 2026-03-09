@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/example/learn-go-gin/internal/cache"
 	"github.com/example/learn-go-gin/internal/config"
 	"github.com/example/learn-go-gin/internal/handler"
 	"github.com/example/learn-go-gin/internal/middleware"
@@ -11,7 +12,7 @@ import (
 
 // main 是 Go 應用程式的進入點。
 // 使用 Gin 框架建立 HTTP 伺服器，並註冊路由。
-// 分層架構：Handler → Service → Repository → DB
+// 分層架構：Handler → Service → Repository → DB / Cache
 func main() {
 	// 載入設定檔
 	config.LoadConfig()
@@ -19,21 +20,23 @@ func main() {
 	// 初始化資料庫連線
 	config.InitDB()
 
+	// 初始化 Redis 連線
+	cache.InitRedis()
+
 	// 初始化各層
-	// Repository → Service → Handler
+	// Repository → Service (with Redis) → Handler
 	bookRepo := repository.NewBookRepository(config.DB)
-	bookService := service.NewBookService(bookRepo)
+	bookService := service.NewBookService(bookRepo, cache.RedisClient)
 	bookViewHandler := handler.NewBookViewHandler(bookService)
 	bookAPIHandler := handler.NewBookAPIHandler(bookService)
 
+	// 快取預熱（啟動時載入常用資料到 Redis）
+	cache.Warmup(bookRepo)
+
 	// 建立 Gin 引擎
-	// 使用 gin.New() 搭配自訂 middleware，而非 gin.Default()
 	r := gin.New()
 
 	// 註冊 middleware
-	// - Recovery: 攔截 panic，避免 server 崩潰
-	// - Logger: 記錄請求日誌
-	// - ErrorHandler: 統一錯誤回應格式
 	r.Use(middleware.Recovery())
 	r.Use(middleware.Logger())
 	r.Use(middleware.ErrorHandler())
