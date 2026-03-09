@@ -1,0 +1,37 @@
+{{define "content"}}
+<h1>{{.book.Title}}</h1>
+
+<dl>
+    <dt>作者</dt>
+    <dd>{{.book.Author}}</dd>
+
+    <dt>ISBN</dt>
+    <dd>{{.book.ISBN}}</dd>
+
+    <dt>庫存</dt>
+    <dd>
+        {{if eq .book.Stock 0}}
+        <span class="text-danger">缺貨</span>
+        {{else}}
+        {{.book.Stock}}
+        {{end}}
+    </dd>
+
+    <dt>建立時間</dt>
+    <dd>{{.book.CreatedAt}}</dd>
+
+    <dt>更新時間</dt>
+    <dd>{{.book.UpdatedAt}}</dd>
+</dl>
+
+<p>
+    <a href="/books/{{.book.ID}}/edit">編輯</a>
+    <form class="inline" action="/books/{{.book.ID}}/delete" method="post" onsubmit="return confirm('確定要刪除這本書嗎？')">
+        <button type="submit" class="btn btn-danger">刪除</button>
+    </form>
+</p>
+
+<a href="/books">&larr; 返回清單</a>
+{{end}}
+
+{{template "layout" .}}

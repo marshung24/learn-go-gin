@@ -14,10 +14,23 @@ func main() {
 	// 建立 Gin 引擎，包含預設的 Logger 和 Recovery middleware
 	r := gin.Default()
 
-	// 註冊路由
+	// 載入 HTML 模板
+	// LoadHTMLGlob 會載入指定 pattern 的所有模板檔案
+	r.LoadHTMLGlob("templates/**/*")
+
+	// 基本路由
 	r.GET("/hello", handler.Hello)
 	r.GET("/health", handler.Health)
 	r.GET("/whoami", handler.Whoami)
+
+	// 書籍 MVC 路由（頁面渲染）
+	r.GET("/books", handler.ListBooks)
+	r.GET("/books/new", handler.NewBookForm)
+	r.GET("/books/:id", handler.ShowBook)
+	r.GET("/books/:id/edit", handler.EditBookForm)
+	r.POST("/books", handler.CreateBook)
+	r.POST("/books/:id/edit", handler.UpdateBook)
+	r.POST("/books/:id/delete", handler.DeleteBook)
 
 	// 啟動 HTTP 伺服器，監聽 8080 port
 	// 這是內嵌的 HTTP Server，不需要額外安裝 Web Server

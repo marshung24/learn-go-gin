@@ -1,0 +1,36 @@
+{{define "content"}}
+<h1>{{if .isEdit}}編輯書籍{{else}}新增書籍{{end}}</h1>
+
+<form action="{{if .isEdit}}/books/{{.book.ID}}/edit{{else}}/books{{end}}" method="post">
+    <p>
+        <label for="title">書名：</label><br>
+        <input type="text" id="title" name="title" value="{{if .book}}{{.book.Title}}{{end}}" required>
+        {{if .errors.title}}<span class="error">{{.errors.title}}</span>{{end}}
+    </p>
+
+    <p>
+        <label for="author">作者：</label><br>
+        <input type="text" id="author" name="author" value="{{if .book}}{{.book.Author}}{{end}}" required>
+        {{if .errors.author}}<span class="error">{{.errors.author}}</span>{{end}}
+    </p>
+
+    <p>
+        <label for="isbn">ISBN：</label><br>
+        <input type="text" id="isbn" name="isbn" value="{{if .book}}{{.book.ISBN}}{{end}}" required>
+        {{if .errors.isbn}}<span class="error">{{.errors.isbn}}</span>{{end}}
+    </p>
+
+    <p>
+        <label for="stock">庫存：</label><br>
+        <input type="number" id="stock" name="stock" value="{{if .book}}{{.book.Stock}}{{else}}0{{end}}" min="0" required>
+        {{if .errors.stock}}<span class="error">{{.errors.stock}}</span>{{end}}
+    </p>
+
+    <p>
+        <button type="submit" class="btn btn-primary">{{if .isEdit}}更新{{else}}新增{{end}}</button>
+        <a href="{{if .isEdit}}/books/{{.book.ID}}{{else}}/books{{end}}">取消</a>
+    </p>
+</form>
+{{end}}
+
+{{template "layout" .}}

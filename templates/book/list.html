@@ -1,0 +1,47 @@
+{{define "content"}}
+<h1>書籍清單</h1>
+
+<p><a href="/books/new">新增書籍</a></p>
+
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>書名</th>
+            <th>作者</th>
+            <th>ISBN</th>
+            <th>庫存</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .books}}
+        <tr>
+            <td>{{.ID}}</td>
+            <td><a href="/books/{{.ID}}">{{.Title}}</a></td>
+            <td>{{.Author}}</td>
+            <td>{{.ISBN}}</td>
+            <td>
+                {{if eq .Stock 0}}
+                <span class="text-danger">缺貨</span>
+                {{else}}
+                {{.Stock}}
+                {{end}}
+            </td>
+            <td>
+                <a href="/books/{{.ID}}/edit">編輯</a>
+                <form class="inline" action="/books/{{.ID}}/delete" method="post" onsubmit="return confirm('確定要刪除這本書嗎？')">
+                    <button type="submit" class="btn btn-danger">刪除</button>
+                </form>
+            </td>
+        </tr>
+        {{else}}
+        <tr>
+            <td colspan="6">目前無書籍資料</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{end}}
+
+{{template "layout" .}}
